@@ -4,13 +4,13 @@
 
 ## 1. Thông tin học viên
 
-- **Họ và tên:**
-- **MSSV:**
+- **Họ và tên:** Nguyễn Hồng Thái
+- **MSSV:** 2A202602894
 - **Lớp:** K4-L3B
-- **Repository URL:**
+- **Repository URL:** https://github.com/thaijaor/K4-L3-DAY13-NguyenHongThai-2A202602894-Monitoring-LLMOps
 - **Commit SHA cuối:**
 - **Challenge ID:**
-- **Tên project Langfuse cá nhân:** `day13-k4-l3b-<MSSV>`
+- **Tên project Langfuse cá nhân:** `day13-k4-l3b-2A202602894`
 
 ## 2. Evidence index
 
@@ -37,20 +37,20 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | | | |
-| `validate_dashboard.py` | | | |
-| `pytest` | | | |
-| Số traces hợp lệ | | | |
-| Số PII leak | | | |
-| Latency P95 / TTFT P95 | | | |
-| Retrieval success rate | | | |
+| `validate_logs.py` | 30/100 (thiếu field bắt buộc, 0 correlation ID, thiếu enrichment) | | |
+| `validate_dashboard.py` | 6/6 | | |
+| `pytest` | 22 passed | | |
+| Số traces hợp lệ | 0 (chỉ có root, chưa có child span) | | |
+| Số PII leak | 0 | | |
+| Latency P95 / TTFT P95 | 7407 ms / 50 ms (10 request) | | |
+| Retrieval success rate | 100% | | |
 
 ## 4. Logging và PII
 
-- **Cách tạo/nhận và truyền correlation ID:**
-- **Các metadata được ghi vào structured log:**
-- **Cách bảo đảm PII được scrub trước khi ghi:**
-- **Cách kiểm chứng kết quả:**
+- **Cách tạo/nhận và truyền correlation ID:** `app/middleware.py` xóa contextvars cũ, nhận `x-request-id` nếu hợp lệ (`[A-Za-z0-9._-]{1,64}`, chống log injection), ngược lại sinh `req-<8 hex>`. ID được bind vào structlog contextvars, gắn vào `request.state`, truyền vào `agent.run()` (trace metadata) và trả lại qua header `x-request-id` cùng `x-response-time-ms`.
+- **Các metadata được ghi vào structured log:** `ts`, `level`, `service`, `event`, `correlation_id`; context bind trong `app/main.py`: `user_id_hash` (SHA-256, 12 ký tự), `session_id`, `feature`, `model`, `env`; `response_sent` thêm `latency_ms`, `ttft_ms`, `tokens_in/out`, `cost_usd`, `quality_score`, `tool_name`, `tool_success`.
+- **Cách bảo đảm PII được scrub trước khi ghi:** processor `scrub_event` (`app/logging_config.py`) scrub đệ quy mọi field string (không chỉ `payload`), đặt sau `format_exc_info` và trước `JsonlFileProcessor`/`JSONRenderer`. `app/pii.py` có pattern email, thẻ, CCCD, SĐT VN, hộ chiếu; thẻ chạy trước CCCD/SĐT và bắt buộc cùng một dấu phân cách để không nuốt nhầm SĐT + CCCD liền nhau.
+- **Cách kiểm chứng kết quả:** `validate_logs.py` 30 → 100/100 ([02](evidence/02-log-validator.txt)); log mẫu [04](evidence/04-structured-log.txt); request chứa đủ 4 loại PII giả → log chỉ còn nhãn `[REDACTED_*]` ([05](evidence/05-pii-redaction.txt)). Tests: `tests/test_pii.py`, `tests/test_correlation_id.py` (sinh/nhận ID, từ chối ID không an toàn, không rò ID giữa 2 request).
 
 ## 5. Tracing và prompt versioning
 

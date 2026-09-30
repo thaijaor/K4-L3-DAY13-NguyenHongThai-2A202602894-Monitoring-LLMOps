@@ -1,0 +1,34 @@
+$ python scripts/load_test.py
+[200] MISSING | qa | 8056.8ms
+[200] MISSING | qa | 2772.9ms
+[200] MISSING | summary | 3721.2ms
+[200] MISSING | qa | 827.0ms
+[200] MISSING | qa | 426.7ms
+[200] MISSING | summary | 459.7ms
+[200] MISSING | qa | 467.4ms
+[200] MISSING | qa | 1926.1ms
+[200] MISSING | qa | 782.6ms
+[200] MISSING | qa | 1095.0ms
+
+$ python scripts/validate_logs.py
+--- Lab Verification Results ---
+Total log records analyzed: 21
+Records with missing required fields: 20
+Records with missing enrichment (context): 20
+Unique correlation IDs found: 0
+Potential PII leaks detected: 0
+
+--- Grading Scorecard (Estimates) ---
+- [FAILED] Missing required fields (ts, level, etc.)
+- [FAILED] Correlation ID propagation (less than 2 unique IDs)
+- [FAILED] Log enrichment (missing user_id_hash, etc.)
++ [PASSED] PII scrubbing
+
+Estimated Score: 30/100
+
+$ python scripts/validate_dashboard.py
+HỢP LỆ: 6/6 panel có trong dashboard contract.
+
+$ python -m pytest -q
+......................                                                   [100%]
+22 passed in 2.35s
