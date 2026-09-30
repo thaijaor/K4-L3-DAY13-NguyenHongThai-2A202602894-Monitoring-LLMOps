@@ -18,17 +18,17 @@
 
 | Evidence | Đường dẫn |
 |---|---|
-| Pytest cuối | `evidence/01-pytest.png` |
-| Log validator | `evidence/02-log-validator.png` |
-| Dashboard validator | `evidence/03-dashboard-validator.png` |
+| Pytest cuối | `evidence/01-pytest.txt` |
+| Log validator | `evidence/02-log-validator.txt` |
+| Dashboard validator | `evidence/03-dashboard-validator.txt` |
 | Structured log | `evidence/04-structured-log.png` |
 | PII redaction | `evidence/05-pii-redaction.png` |
-| Trace list | `evidence/06-trace-list.png` |
-| Trace waterfall | `evidence/07-trace-waterfall.png` |
-| Trace metadata | `evidence/08-trace-metadata.png` |
-| Prompt versions | `evidence/09-prompt-versions.png` |
-| Prompt rollback | `evidence/10-prompt-rollback.png` |
-| Dashboard runtime | `evidence/11-dashboard-overview.png` |
+| Trace list | `evidence/06-trace-list.webp` |
+| Trace waterfall | `evidence/07-trace-waterfall.webp` |
+| Trace metadata | `evidence/08-trace-metadata.webp` |
+| Prompt versions | `evidence/10a-prompt-promote-v2.webp` (v1/v2 và labels) |
+| Prompt rollback | `evidence/10a-prompt-promote-v2.webp`, `evidence/10b-prompt-rollback-v1.webp` |
+| Dashboard runtime | `evidence/11-dashboard-overview.webp` |
 | Incident metric | `evidence/12-incident-metric.png` |
 | Incident log | `evidence/13-incident-log.png` |
 | Incident trace | `evidence/14-incident-trace.png` |
@@ -61,7 +61,7 @@
 - **Version/label baseline:** v1 — labels `baseline`, `production` (template gốc 3 biến)
 - **Version/label candidate:** v2 — label `candidate` (thêm yêu cầu trả lời ≤ 3 bullet; tokens_in 32 → 49 với cùng input)
 - **Trace ID của mỗi version:** v1 `851e0f4e6ab79d13ea160b9074578c27` (`req-prompt-baseline`); v2 `d5bf32ddd9b2dcd9b2b29bbb9c319e1a` (`req-prompt-candidate`)
-- **Cách promote và rollback `production`:**
+- **Cách promote và rollback `production`:** trên Langfuse UI chuyển label `production` từ v1 sang v2 ([10a](evidence/10a-prompt-promote-v2.webp)), rồi trả về v1 ([10b](evidence/10b-prompt-rollback-v1.webp)); không sửa code, app đọc prompt theo label (cache 60s). Sau rollback, `req-after-rollback` dùng `production` → v1 (trace `7d1134924385575e2e54086d7f362e2a`, tokens_in 32 như v1).
 
 ## 6. Dashboard, SLO và alerts
 

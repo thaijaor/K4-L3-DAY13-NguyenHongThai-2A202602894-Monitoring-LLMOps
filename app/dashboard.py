@@ -163,6 +163,8 @@ def _local(t: datetime) -> datetime:
 
 def _line_chart(data: dict[str, list[tuple[datetime, float]]], start, end, unit, thr, thr_label, vmin_max=1.0) -> str:
     vmax = _nice_max(max([v for pts in data.values() for _, v in pts] + [thr, vmin_max]) * 1.1)
+    if unit == "score_0_to_1":
+        vmax = 1.0  # điểm quality luôn trong [0, 1]
     body = [_axes(start, end, vmax, unit), _threshold(thr, vmax, thr_label)]
     for i, (name, pts) in enumerate(data.items(), start=1):
         if not pts:
