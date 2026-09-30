@@ -54,21 +54,21 @@
 
 ## 5. Tracing và prompt versioning
 
-- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:**
-- **Cấu trúc root/retrieval/generation observations:**
-- **Cách nối trace với log:**
-- **Prompt name:**
-- **Version/label baseline:**
-- **Version/label candidate:**
-- **Trace ID của mỗi version:**
+- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:** trace sinh từ `load_test.py --concurrency 5` với key của project `day13-k4-l3b-2A202602894`; mỗi trace có `correlation_id` trùng một dòng trong `data/logs.jsonl` của máy tôi.
+- **Cấu trúc root/retrieval/generation observations:** `day13-agent-request` → `lab-agent-run` (agent) → `retrieval` (retriever: query preview đã scrub, `doc_count`, level `ERROR` khi retrieval lỗi) + `llm-generation` (generation: model, prompt link, `usage_details` input/output, `cost_details`, `completion_start_time` để Langfuse tính TTFT). Input/output chỉ là preview đã scrub PII.
+- **Cách nối trace với log:** `correlation_id` do middleware sinh được truyền vào `agent.run()` và đặt trong trace metadata qua `propagate_attributes`, nên tìm được trace từ log line và ngược lại.
+- **Prompt name:** `day13-chat` (tạo bằng `scripts/setup_prompts.py`)
+- **Version/label baseline:** v1 — labels `baseline`, `production` (template gốc 3 biến)
+- **Version/label candidate:** v2 — label `candidate` (thêm yêu cầu trả lời ≤ 3 bullet; tokens_in 32 → 49 với cùng input)
+- **Trace ID của mỗi version:** v1 `851e0f4e6ab79d13ea160b9074578c27` (`req-prompt-baseline`); v2 `d5bf32ddd9b2dcd9b2b29bbb9c319e1a` (`req-prompt-candidate`)
 - **Cách promote và rollback `production`:**
 
 ## 6. Dashboard, SLO và alerts
 
-- **Dashboard và sáu panel:**
-- **SLO và lý do chọn:**
-- **Cách tính error budget:**
-- **Ba alert và runbook tương ứng:**
+- **Dashboard và sáu panel:** endpoint `GET /dashboard` (`app/dashboard.py`) đọc `data/logs.jsonl` theo `config/dashboard.yaml`: time range 60 phút, refresh 30s, mỗi panel có đơn vị, threshold (đường đứt đỏ) và trạng thái OK/vượt ngưỡng. Latency có P50/P95/P99 + TTFT P95; Errors có error rate, breakdown và retrieval success.
+- **SLO và lý do chọn:** giữ `fast_successful_requests`: 99.5% request thành công và ≤ 3000 ms trong 28 ngày. Baseline P95 ~1450 ms, P99 ~1600 ms, 0 lỗi → 3000 ms dư ~2x cho tail nhưng vẫn bắt được retrieval chậm thêm 2.5 s.
+- **Cách tính error budget:** 100% − 99.5% = 0.5%. 10,000 request/28 ngày → tối đa 50 request lỗi hoặc > 3000 ms. Burn rate = tỉ lệ request xấu / 0.5%; > 1 kéo dài là sẽ hết budget trước hạn.
+- **Ba alert và runbook tương ứng:** `HighLatencyP95` (warning, P95 > 3000 ms/5m), `HighErrorRate` (critical, > 2%/5m), `LowRetrievalSuccess` (warning, < 90%/10m); Slack `#k4-l3b-alerts`, owner `student-2A202602894`. Xem `config/alert_rules.yaml`, runbook `docs/alerts.md`.
 
 > Ví dụ cách viết error budget: "SLO 99.5% trong 28 ngày nghĩa là error budget 0.5%. Nếu workload có 10,000 request thì tối đa 50 request được phép lỗi hoặc chậm hơn ngưỡng SLO."
 

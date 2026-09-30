@@ -16,10 +16,26 @@ class ManagedPrompt:
         )
 
 
+class RecordingObservation:
+    def __init__(self, **kwargs) -> None:
+        self.start = kwargs
+        self.updates: dict = {}
+
+    def update(self, **kwargs) -> None:
+        self.updates.update(kwargs)
+
+
 class RecordingLangfuseClient:
     def __init__(self) -> None:
         self.prompt = ManagedPrompt()
         self.span_updates: list[dict] = []
+        self.observations: list[RecordingObservation] = []
+
+    @contextmanager
+    def start_as_current_observation(self, **kwargs):
+        observation = RecordingObservation(**kwargs)
+        self.observations.append(observation)
+        yield observation
 
     def get_prompt(self, name: str, **kwargs):
         return self.prompt
@@ -67,3 +83,33 @@ def test_agent_records_prompt_version_with_v4_observation_api(monkeypatch) -> No
     assert span_update["version"] == "3"
     assert propagated[0]["metadata"]["correlation_id"] == "req-12345678"
     assert propagated[-1]["prompt"] is client.prompt
+
+
+def test_agent_creates_retrieval_and_generation_children(monkeypatch) -> None:
+    client = RecordingLangfuseClient()
+    monkeypatch.setattr(agent_module, "get_langfuse_client", lambda: client)
+    monkeypatch.setattr(agent_module, "tracing_enabled", lambda: True)
+
+    agent = agent_module.LabAgent()
+    result = agent_module.LabAgent.run.__wrapped__(
+        agent,
+        user_id="student-01",
+        feature="qa",
+        session_id="session-01",
+        message="Refund policy? mail me at student@vinuni.edu.vn",
+        correlation_id="req-12345678",
+    )
+
+    retrieval, generation = client.observations
+    assert (retrieval.start["name"], retrieval.start["as_type"]) == ("retrieval", "retriever")
+    assert retrieval.updates["output"]["doc_count"] == 1
+
+    assert (generation.start["name"], generation.start["as_type"]) == ("llm-generation", "generation")
+    assert generation.start["model"] == agent.model
+    assert generation.start["prompt"] is client.prompt
+    assert generation.updates["usage_details"] == {"input": result.tokens_in, "output": result.tokens_out}
+    assert generation.updates["cost_details"]["total"] == result.cost_usd
+
+    # Không đưa PII thô vào trace.
+    recorded = repr([o.start for o in client.observations] + [o.updates for o in client.observations])
+    assert "student@vinuni.edu.vn" not in recorded

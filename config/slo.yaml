@@ -7,7 +7,11 @@ primary_slo:
     total_event: 'event == "request_received"'
   target_percent: 99.5
   error_budget_percent: 0.5
-  note: Học viên phải giải thích hoặc điều chỉnh ngưỡng bằng baseline của mình. Ví dụ nếu có 10,000 request trong cửa sổ 28 ngày, error budget 0.5% nghĩa là tối đa 50 request được phép không đạt SLO.
+  note: >-
+    Giữ 3000 ms / 99.5%. Baseline sau CP1 (10 request, concurrency 5): P95 ~1450 ms, P99 ~1600 ms,
+    0 lỗi, nên 3000 ms còn dư ~2x cho tail latency nhưng vẫn bắt được rag_slow (+2500 ms/request).
+    Error budget 0.5% trong 28 ngày: 10,000 request -> tối đa 50 request lỗi hoặc > 3000 ms.
+    Burn rate = (tỉ lệ request xấu thực tế) / 0.5%; burn rate > 1 kéo dài nghĩa là sẽ hết budget trước hạn.
 guardrails:
   error_rate_pct_max: 2
   daily_cost_usd_max: 2.5
