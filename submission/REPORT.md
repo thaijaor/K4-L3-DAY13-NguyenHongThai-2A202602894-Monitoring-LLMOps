@@ -31,20 +31,20 @@ Giữ đúng ba output text và năm ảnh dưới đây. Không tách thêm ả
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | 30/100 (thiếu field bắt buộc, 0 correlation ID, thiếu enrichment) | | |
-| `validate_dashboard.py` | 6/6 | | |
-| `pytest` | 22 passed | | |
-| Số traces hợp lệ | 0 (chỉ có root, chưa có child span) | | |
-| Số PII leak | 0 | | |
-| Latency P95 / TTFT P95 | 7407 ms / 50 ms (10 request) | | |
-| Retrieval success rate | 100% | | |
+| `validate_logs.py` | 30/100 (thiếu field bắt buộc, 0 correlation ID, thiếu enrichment) | 100/100 | correlation ID, enrichment, PII scrub đều đạt |
+| `validate_dashboard.py` | 6/6 | 6/6 | contract giữ nguyên; thêm dashboard runtime `/dashboard` |
+| `pytest` | 22 passed | 32 passed | +10 test: PII, correlation ID, child observations, dashboard |
+| Số traces hợp lệ | 0 (chỉ có root, chưa có child span) | 36 | root + retrieval + generation, có correlation ID |
+| Số PII leak | 0 | 0 | request có đủ 4 loại PII giả chỉ còn `[REDACTED_*]` |
+| Latency P95 / TTFT P95 | 7407 ms / 50 ms (10 request) | 1601 ms / 50 ms bình thường; 2652 ms / 50 ms trong challenge | baseline cao do timeout TLS tới Langfuse khi chưa có prompt |
+| Retrieval success rate | 100% | 100% | `rag_slow` làm chậm, không làm lỗi retrieval |
 
 ## 4. Logging và PII
 
 - **Cách tạo/nhận và truyền correlation ID:** `app/middleware.py` xóa contextvars cũ, nhận `x-request-id` nếu hợp lệ (`[A-Za-z0-9._-]{1,64}`, chống log injection), ngược lại sinh `req-<8 hex>`. ID được bind vào structlog contextvars, gắn vào `request.state`, truyền vào `agent.run()` (trace metadata) và trả lại qua header `x-request-id` cùng `x-response-time-ms`.
 - **Các metadata được ghi vào structured log:** `ts`, `level`, `service`, `event`, `correlation_id`; context bind trong `app/main.py`: `user_id_hash` (SHA-256, 12 ký tự), `session_id`, `feature`, `model`, `env`; `response_sent` thêm `latency_ms`, `ttft_ms`, `tokens_in/out`, `cost_usd`, `quality_score`, `tool_name`, `tool_success`.
 - **Cách bảo đảm PII được scrub trước khi ghi:** processor `scrub_event` (`app/logging_config.py`) scrub đệ quy mọi field string (không chỉ `payload`), đặt sau `format_exc_info` và trước `JsonlFileProcessor`/`JSONRenderer`. `app/pii.py` có pattern email, thẻ, CCCD, SĐT VN, hộ chiếu; thẻ chạy trước CCCD/SĐT và bắt buộc cùng một dấu phân cách để không nuốt nhầm SĐT + CCCD liền nhau.
-- **Cách kiểm chứng kết quả:** `validate_logs.py` 30 → 100/100 ([02](evidence/02-log-validator.txt)); log mẫu [04](evidence/04-structured-log.txt); request chứa đủ 4 loại PII giả → log chỉ còn nhãn `[REDACTED_*]` ([05](evidence/05-pii-redaction.txt)). Tests: `tests/test_pii.py`, `tests/test_correlation_id.py` (sinh/nhận ID, từ chối ID không an toàn, không rò ID giữa 2 request).
+- **Cách kiểm chứng kết quả:** `validate_logs.py` 30 → 100/100, 0 PII leak ([log-validator.txt](evidence/log-validator.txt)); log mẫu [01-incident-log](evidence/01-incident-log.png); request `req-piidemo1` chứa email, SĐT, CCCD, thẻ giả → log `[REDACTED_EMAIL] [REDACTED_PHONE_VN] [REDACTED_CCCD] [REDACTED_CREDIT_CARD]`. Tests: `tests/test_pii.py`, `tests/test_correlation_id.py` (sinh/nhận ID, từ chối ID không an toàn, không rò ID giữa 2 request).
 
 ## 5. Tracing và prompt versioning
 
@@ -55,7 +55,7 @@ Giữ đúng ba output text và năm ảnh dưới đây. Không tách thêm ả
 - **Version/label baseline:** v1 — labels `baseline`, `production` (template gốc 3 biến)
 - **Version/label candidate:** v2 — label `candidate` (thêm yêu cầu trả lời ≤ 3 bullet; tokens_in 32 → 49 với cùng input)
 - **Trace ID của mỗi version:** v1 `851e0f4e6ab79d13ea160b9074578c27` (`req-prompt-baseline`); v2 `d5bf32ddd9b2dcd9b2b29bbb9c319e1a` (`req-prompt-candidate`)
-- **Cách promote và rollback `production`:** trên Langfuse UI chuyển label `production` từ v1 sang v2 ([10a](evidence/10a-prompt-promote-v2.webp)), rồi trả về v1 ([10b](evidence/10b-prompt-rollback-v1.webp)); không sửa code, app đọc prompt theo label (cache 60s). Sau rollback, `req-after-rollback` dùng `production` → v1 (trace `7d1134924385575e2e54086d7f362e2a`, tokens_in 32 như v1).
+- **Cách promote và rollback `production`:** chuyển label `production` sang v2 (Langfuse UI hoặc `python scripts/set_production.py 2`), restart API (SDK cache 60s): `req-prod-v2` → trace `9ac16e538bb9646dadfef88bae58c6b4`, `prompt_label=production`, `prompt_version=2`, tokens_in 49. Rollback `python scripts/set_production.py 1`: `req-prod-rollback-v1` → trace `2436e2a7cb7c049a2138ed25e5b5b934`, `production` v1, tokens_in 32. Không sửa code. Ảnh: [04-prompt-versioning](evidence/04-prompt-versioning.png).
 
 ## 6. Dashboard, SLO và alerts
 
@@ -64,7 +64,6 @@ Giữ đúng ba output text và năm ảnh dưới đây. Không tách thêm ả
 - **Cách tính error budget:** 100% − 99.5% = 0.5%. 10,000 request/28 ngày → tối đa 50 request lỗi hoặc > 3000 ms. Burn rate = tỉ lệ request xấu / 0.5%; > 1 kéo dài là sẽ hết budget trước hạn.
 - **Ba alert và runbook tương ứng:** `HighLatencyP95` (warning, P95 > 3000 ms/5m), `HighErrorRate` (critical, > 2%/5m), `LowRetrievalSuccess` (warning, < 90%/10m); Slack `#k4-l3b-alerts`, owner `student-2A202602894`. Xem `config/alert_rules.yaml`, runbook `docs/alerts.md`.
 
-> Ví dụ cách viết error budget: "SLO 99.5% trong 28 ngày nghĩa là error budget 0.5%. Nếu workload có 10,000 request thì tối đa 50 request được phép lỗi hoặc chậm hơn ngưỡng SLO."
 
 ## 7. Điều tra challenge
 
@@ -77,17 +76,16 @@ Giữ đúng ba output text và năm ảnh dưới đây. Không tách thêm ả
 - **Fix action:** khôi phục retrieval (`inject_incident.py --disable`); chạy lại cùng 5 query challenge: 630–790 ms phía client, retrieval về 0 ms.
 - **Preventive measure:** alert `HighLatencyP95` (P95 > 3000 ms/5m) cộng thêm ngưỡng riêng cho span retrieval (vd. > 1000 ms); timeout + fallback answer cho retrieval; chạy `agent.run()` trong threadpool để một dependency chậm không chặn request khác; đo latency phía client/gateway vì log server bỏ sót thời gian xếp hàng.
 
-> Gợi ý cách viết ngắn, không thay cho evidence thực tế: "Metric cho thấy `[latency/error/cost/quality]` bất thường trong `[khoảng thời gian]`. Log line `[event]` có `correlation_id=[...]` đại diện cho request bị ảnh hưởng. Trace cùng `correlation_id` cho thấy span `[retrieval/generation/prompt/tool]` có dấu hiệu `[chậm/lỗi/token tăng]`. Root cause là `[nguyên nhân suy ra từ evidence]`. Fix action là `[hành động khôi phục]`; preventive measure là `[alert/runbook/test/guardrail để ngăn tái diễn]`."
 
 ## 8. Giải thích và tự đánh giá
 
-- **Một quyết định kỹ thuật quan trọng và lý do:**
-- **Một lỗi/blocker đã gặp:**
-- **Cách tìm nguyên nhân và xử lý:**
-- **Cách hiểu luồng Metrics → Logs → Traces:**
-- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:**
-- **Điều quan trọng nhất đã học:**
-- **Hạn chế hoặc phần chưa hoàn thành, nếu có:**
+- **Một quyết định kỹ thuật quan trọng và lý do:** tự dựng dashboard `/dashboard` (Python + SVG, đọc `data/logs.jsonl` và `config/dashboard.yaml`) thay vì thêm Grafana/Streamlit: không thêm dependency nên repo chạy lại được chỉ với `requirements.txt`, và ngưỡng lấy thẳng từ contract nên dashboard luôn khớp validator. Đánh đổi: không có zoom/filter như Grafana.
+- **Một lỗi/blocker đã gặp:** (1) đưa pattern thẻ lên trước CCCD làm regex thẻ nuốt nhầm "4567 001203004567" (đuôi SĐT + CCCD), để lộ `090 123` trong log mà validator không bắt được. (2) Trace của 2 request đầu không lên Langfuse.
+- **Cách tìm nguyên nhân và xử lý:** (1) phát hiện khi đọc lại log của request PII demo; sửa regex thẻ bắt buộc cùng một dấu phân cách (``), thêm test PII liền nhau, xóa log bị lộ và chạy lại. (2) Server bị tắt trước khi SDK gửi batch span; thêm `flush()` khi app shutdown.
+- **Cách hiểu luồng Metrics → Logs → Traces:** metric cho biết có vấn đề gì và từ lúc nào (latency 2652 ms, TTFT không đổi); log chọn ra request cụ thể bị ảnh hưởng qua `correlation_id` (`req-37af7664`); trace của đúng request đó tách thời gian theo từng bước (retrieval 2501 ms) nên kết luận root cause dựa trên bằng chứng, không đoán.
+- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:** prompt là config ảnh hưởng trực tiếp token/cost/quality; v2 tăng tokens_in 32 → 49 (+53%) với cùng input. Gắn version vào trace giúp quy regression về đúng version, rollback bằng đổi label không cần deploy. SLO/error budget quyết định khi nào phải dừng thay đổi để ổn định hệ thống.
+- **Điều quan trọng nhất đã học:** latency đo ở server có thể sai lệch với trải nghiệm người dùng: log ghi 2.65 s nhưng client chờ 8–13 s vì `agent.run()` đồng bộ chặn event loop, request đồng thời phải xếp hàng.
+- **Hạn chế hoặc phần chưa hoàn thành, nếu có:** chưa sửa lỗi chặn event loop (mới ghi là preventive measure); dashboard không đo latency phía client; alert mới định nghĩa trong YAML, chưa nối Slack thật.
 
 ## 9. Checklist trước khi nộp
 

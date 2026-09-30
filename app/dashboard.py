@@ -14,6 +14,15 @@ import yaml
 from . import logging_config
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "dashboard.yaml"
+CHALLENGE_PATH = Path(__file__).resolve().parents[1] / "config" / "challenge.json"
+
+
+def _slow_threshold_ms() -> int:
+    """Ngưỡng request chậm của challenge (nếu có), để incident dưới ngưỡng SLO vẫn hiện rõ."""
+    try:
+        return int(json.loads(CHALLENGE_PATH.read_text(encoding="utf-8"))["latency_threshold_ms"])
+    except (OSError, ValueError, KeyError):
+        return 2000
 
 W, H = 520, 200
 PAD_L, PAD_R, PAD_T, PAD_B = 52, 16, 14, 28
@@ -80,6 +89,8 @@ def compute(now: datetime | None = None) -> dict[str, Any]:
             "p99": _percentile([e["latency_ms"] for e in sent], 99),
             "ttft_p95": _percentile([e["ttft_ms"] for e in sent], 95),
         },
+        "slow_threshold_ms": (slow_ms := _slow_threshold_ms()),
+        "slow_count": sum(e["latency_ms"] > slow_ms for e in sent),
         "traffic": series("request_received", len),
         "traffic_total": len(received),
         "error_rate": [
@@ -225,7 +236,8 @@ def render_html() -> str:
             _stat("P50", f'{ln["p50"]:,.0f} ms', True)
             + _stat("P95", f'{ln["p95"]:,.0f} ms', ln["p95"] <= thr["latency"])
             + _stat("P99", f'{ln["p99"]:,.0f} ms', True)
-            + _stat("TTFT P95", f'{ln["ttft_p95"]:,.0f} ms', True),
+            + _stat("TTFT P95", f'{ln["ttft_p95"]:,.0f} ms', True)
+            + _stat(f'Request > {d["slow_threshold_ms"]:,} ms', f'{d["slow_count"]}', d["slow_count"] == 0),
             _line_chart(d["latency"], start, end, "ms", thr["latency"], f'SLO P95 ≤ {thr["latency"]:,} ms'),
             _legend(list(d["latency"])),
         ),

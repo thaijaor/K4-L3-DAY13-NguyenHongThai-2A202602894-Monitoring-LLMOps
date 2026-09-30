@@ -50,6 +50,7 @@ def test_compute_matches_dashboard_contract(monkeypatch, tmp_path: Path) -> None
 
     assert d["traffic_total"] == 3
     assert d["latency_now"]["p95"] == 3500
+    assert d["slow_count"] == 1  # chỉ request 3500 ms vượt ngưỡng 2000 ms của challenge
     assert round(d["error_rate_total"], 2) == 33.33
     assert d["error_breakdown"] == {"RuntimeError": 1}
     assert round(d["retrieval_success"], 2) == 66.67
