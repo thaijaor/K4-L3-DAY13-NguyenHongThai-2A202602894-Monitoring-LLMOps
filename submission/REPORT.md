@@ -9,7 +9,7 @@
 - **Lớp:** K4-L3B
 - **Repository URL:** https://github.com/thaijaor/K4-L3-DAY13-NguyenHongThai-2A202602894-Monitoring-LLMOps
 - **Commit SHA cuối:**
-- **Challenge ID:**
+- **Challenge ID:** `day13-k4-l3b-monitoring-llmops-v1`
 - **Tên project Langfuse cá nhân:** `day13-k4-l3b-2A202602894`
 
 ## 2. Evidence index
@@ -68,14 +68,14 @@ Giữ đúng ba output text và năm ảnh dưới đây. Không tách thêm ả
 
 ## 7. Điều tra challenge
 
-- **Challenge ID:**
-- **Khoảng thời gian điều tra:**
-- **Triệu chứng từ metrics:**
-- **Log line và correlation ID liên quan:**
-- **Trace ID và span gây ảnh hưởng:**
-- **Root cause:**
-- **Fix action:**
-- **Preventive measure:**
+- **Challenge ID:** `day13-k4-l3b-monitoring-llmops-v1` (cohort K4, feature bị ảnh hưởng `monitoring`)
+- **Khoảng thời gian điều tra:** 2026-09-30 10:45:54–10:46:09 (GMT+7); tắt incident lúc 10:46:56, chạy lại cùng query lúc 10:46:57 để xác nhận hồi phục.
+- **Triệu chứng từ metrics:** panel Latency: 5/5 request `monitoring` có `latency_ms` 2651–2653 (P50/P95 ≈ 2652 ms), vượt `latency_threshold_ms` 2000 của challenge; lượt bình thường ngay trước đó P50 151 ms. TTFT P95 giữ 50 ms, error rate 0%, retrieval success 100%, tokens/cost/quality không đổi → thời gian tăng nằm trước bước LLM.
+- **Log line và correlation ID liên quan:** `response_sent` của `req-37af7664`: `feature=monitoring`, `latency_ms=2652`, `ttft_ms=50`, `tool_success=true`, ts `03:45:58.685Z`.
+- **Trace ID và span gây ảnh hưởng:** trace `0acc9534aea9684859215f8656b53b72` (cùng `correlation_id`): `lab-agent-run` 2652 ms = `retrieval` **2501 ms** + `llm-generation` 151 ms. Request bình thường `req-766c2adc` (trace `11520e7f37b4da7231a4392b09fc22bd`): retrieval 0 ms, generation 151 ms.
+- **Root cause:** bước retrieval (vector store) chậm thêm ~2.5 s mỗi request (incident `rag_slow`); LLM, prompt (v1) và token không đổi. Phụ: `/chat` là `async def` nhưng gọi `agent.run()` đồng bộ nên retrieval chậm chặn event loop — 5 request đồng thời bị xếp hàng, client thấy 8–13 s dù log server ghi 2.65 s.
+- **Fix action:** khôi phục retrieval (`inject_incident.py --disable`); chạy lại cùng 5 query challenge: 630–790 ms phía client, retrieval về 0 ms.
+- **Preventive measure:** alert `HighLatencyP95` (P95 > 3000 ms/5m) cộng thêm ngưỡng riêng cho span retrieval (vd. > 1000 ms); timeout + fallback answer cho retrieval; chạy `agent.run()` trong threadpool để một dependency chậm không chặn request khác; đo latency phía client/gateway vì log server bỏ sót thời gian xếp hàng.
 
 > Gợi ý cách viết ngắn, không thay cho evidence thực tế: "Metric cho thấy `[latency/error/cost/quality]` bất thường trong `[khoảng thời gian]`. Log line `[event]` có `correlation_id=[...]` đại diện cho request bị ảnh hưởng. Trace cùng `correlation_id` cho thấy span `[retrieval/generation/prompt/tool]` có dấu hiệu `[chậm/lỗi/token tăng]`. Root cause là `[nguyên nhân suy ra từ evidence]`. Fix action là `[hành động khôi phục]`; preventive measure là `[alert/runbook/test/guardrail để ngăn tái diễn]`."
 
