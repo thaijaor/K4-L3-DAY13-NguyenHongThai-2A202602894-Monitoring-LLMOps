@@ -1,6 +1,6 @@
 # Báo cáo cá nhân — K4-L3B Day 13 Monitoring & LLMOps
 
-> Mỗi học viên hoàn thiện một file duy nhất này. Khi dẫn evidence, dùng đường dẫn tương đối, ví dụ `evidence/07-trace-waterfall.png`.
+> Mỗi học viên hoàn thiện một file duy nhất này. Chỉ cần 3 output text và 5 ảnh runtime; dùng đường dẫn tương đối, ví dụ `evidence/03-incident-trace.png`.
 
 ## 1. Thông tin học viên
 
@@ -14,24 +14,18 @@
 
 ## 2. Evidence index
 
-Điền đúng đường dẫn tới evidence thực tế. Có thể đổi tên hoặc dùng nhiều ảnh nếu cần.
+Giữ đúng ba output text và năm ảnh dưới đây. Không tách thêm ảnh; nếu cần giải thích, ghi bằng chữ trong các mục sau.
 
 | Evidence | Đường dẫn |
 |---|---|
-| Pytest cuối | `evidence/01-pytest.txt` |
-| Log validator | `evidence/02-log-validator.txt` |
-| Dashboard validator | `evidence/03-dashboard-validator.txt` |
-| Structured log | `evidence/04-structured-log.png` |
-| PII redaction | `evidence/05-pii-redaction.png` |
-| Trace list | `evidence/06-trace-list.webp` |
-| Trace waterfall | `evidence/07-trace-waterfall.webp` |
-| Trace metadata | `evidence/08-trace-metadata.webp` |
-| Prompt versions | `evidence/10a-prompt-promote-v2.webp` (v1/v2 và labels) |
-| Prompt rollback | `evidence/10a-prompt-promote-v2.webp`, `evidence/10b-prompt-rollback-v1.webp` |
-| Dashboard runtime | `evidence/11-dashboard-overview.webp` |
-| Incident metric | `evidence/12-incident-metric.png` |
-| Incident log | `evidence/13-incident-log.png` |
-| Incident trace | `evidence/14-incident-trace.png` |
+| Pytest cuối | `evidence/pytest.txt` |
+| Log validator | `evidence/log-validator.txt` |
+| Dashboard validator | `evidence/dashboard-validator.txt` |
+| Structured log + incident log | `evidence/01-incident-log.png` |
+| Trace list | `evidence/02-trace-list.png` |
+| Trace waterfall + metadata + incident trace | `evidence/03-incident-trace.png` |
+| Prompt versions + promote/rollback | `evidence/04-prompt-versioning.png` |
+| Dashboard + incident metric | `evidence/05-dashboard-incident.png` |
 
 ## 3. Kết quả kỹ thuật
 
@@ -99,6 +93,7 @@
 
 - [ ] Kết quả và evidence thuộc commit SHA cuối.
 - [ ] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
+- [ ] Có đúng 3 file text và 5 ảnh runtime theo hướng dẫn.
 - [ ] Incident evidence nối đúng metric → log → trace.
 - [ ] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
 - [ ] Repository chạy lại được theo README.
